@@ -1,0 +1,46 @@
+/* custom-animations.css */
+
+/* Animation for the Fire icon */
+@keyframes flicker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+.animate-flicker {
+  animation: flicker 1.5s infinite ease-in-out;
+}
+
+/* Animation for the Wind icon */
+@keyframes sway {
+  0%, 100% { transform: translateX(-2px) rotate(-3deg); }
+  50% { transform: translateX(2px) rotate(3deg); }
+}
+.animate-sway {
+  animation: sway 3s infinite ease-in-out;
+}
+
+/* Animation for the Rain icon */
+@keyframes raindrop {
+  0% { transform: translateY(-5px); opacity: 1; }
+  75% { transform: translateY(5px); opacity: 1; }
+  100% { transform: translateY(8px); opacity: 0; }
+}
+.animate-rain-container::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: raindrop 1s infinite;
+}
+
+/* Animation for the Ocean icon */
+@keyframes wave {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.8); }
+}
+.animate-wave {
+  animation: wave 2.5s infinite ease-in-out;
+}
