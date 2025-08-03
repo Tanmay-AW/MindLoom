@@ -1,0 +1,18 @@
+# Node dependencies
+node_modules/
+
+# Build output (Vite or CRA)
+dist/
+build/
+
+# Environment variables (if using Vite envs)
+.env
+.env.local
+.env.*
+
+# Vite cache
+.vite/
+
+# Editor junk
+.vscode/
+.DS_Store

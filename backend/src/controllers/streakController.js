@@ -1,62 +1,58 @@
 import asyncHandler from 'express-async-handler';
-import MoodLog from '../models/moodLogModel.js';
-import PromptEntry from '../models/promptEntryModel.js';
+import UserHabitPack from '../models/userHabitPackModel.js';
+import JournalEntry from '../models/journalEntryModel.js';
+
+// Helper function to check if two dates are on the same day (ignoring time)
+const isSameDay = (date1, date2) => {
+  return date1.getFullYear() === date2.getFullYear() &&
+         date1.getMonth() === date2.getMonth() &&
+         date1.getDate() === date2.getDate();
+};
 
 // @desc    Get the current streak for the logged-in user
 // @route   GET /api/streaks
 // @access  Private
 const getUserStreak = asyncHandler(async (req, res) => {
   const userId = req.user._id;
+
+  // 1. Fetch all potential activity sources for the user
+  const habitPacks = await UserHabitPack.find({ user: userId });
+  const journalEntries = await JournalEntry.find({ user: userId });
+
+  // 2. Combine all entry dates into a single list
+  const habitPackDates = habitPacks.flatMap(pack => pack.entries.map(entry => entry.completedAt));
+  const journalDates = journalEntries.map(entry => entry.createdAt);
+  
+  const allActivityDates = [...habitPackDates, ...journalDates];
+
+  // 3. Create a unique, sorted list of dates the user was active
+  const uniqueDays = [...new Set(allActivityDates.map(date => new Date(date).toDateString()))]
+    .map(dateString => new Date(dateString))
+    .sort((a, b) => b - a); // Sort from most recent to oldest
+
+  if (uniqueDays.length === 0) {
+    return res.json({ streak: 0 });
+  }
+
+  // 4. Calculate the consecutive day streak
   let streak = 0;
-  let checkDate = new Date(); // Start checking from today
+  let today = new Date();
+  
+  // Check if the most recent activity was today or yesterday
+  const mostRecentActivity = uniqueDays[0];
+  if (isSameDay(mostRecentActivity, today) || isSameDay(mostRecentActivity, new Date(today.setDate(today.getDate() - 1)))) {
+    streak = 1;
+    let previousDay = new Date(mostRecentActivity);
 
-  // Function to check if an activity exists for a given day
-  const hasActivityForDay = async (date) => {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    for (let i = 1; i < uniqueDays.length; i++) {
+      const currentActivityDate = uniqueDays[i];
+      previousDay.setDate(previousDay.getDate() - 1); // Move to the day before
 
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    // Check for either a mood log OR a prompt entry
-    const moodLog = await MoodLog.findOne({
-      user: userId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-    });
-
-    if (moodLog) return true;
-
-    const promptEntry = await PromptEntry.findOne({
-      user: userId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-    });
-    
-    return !!promptEntry; // Returns true if a prompt entry is found
-  };
-
-  // Loop backwards day by day to calculate the streak
-  while (true) {
-    const hasActivity = await hasActivityForDay(checkDate);
-    if (hasActivity) {
-      streak++;
-      // Move to the previous day
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      // If there's no activity for today, we need to check if yesterday had activity.
-      // If yesterday also had no activity, the streak is 0.
-      // If yesterday DID have activity, the streak count is correct from the loop.
-      if (streak === 0) {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const hasActivityYesterday = await hasActivityForDay(yesterday);
-        if (!hasActivityYesterday) {
-            // No activity today or yesterday, so streak is definitely 0.
-        } else {
-            // This case is complex, for now we keep it simple.
-            // A more advanced logic could see if the last activity was yesterday.
-        }
+      if (isSameDay(currentActivityDate, previousDay)) {
+        streak++; // It's a consecutive day, so increment the streak
+      } else {
+        break; // The streak is broken
       }
-      break; // End the loop when a day with no activity is found
     }
   }
 

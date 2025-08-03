@@ -1,78 +1,106 @@
 import asyncHandler from 'express-async-handler';
 import PromptEntry from '../models/promptEntryModel.js';
+import UserHabitPack from '../models/userHabitPackModel.js';
+import MoodLog from '../models/moodLogModel.js'; // 1. Import the MoodLog model
 
-// A simple list of prompts. In a real app, this might come from a database.
-const dailyPrompts = [
-  "What is one thing you're grateful for today?",
-  "Describe a small moment of joy you experienced recently.",
-  "What is a challenge you're currently facing, and what's one small step you can take to address it?",
-  "Who is someone who has had a positive impact on you lately?",
-  "What is a quality you admire in yourself?",
-  "Write about a place where you feel completely at peace.",
-  "What's a simple pleasure you often overlook?"
-];
-
-// Function to get a consistent prompt for the current day
-const getPromptForDay = () => {
-  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-  return dailyPrompts[dayOfYear % dailyPrompts.length];
-};
-
-// @desc    Get today's prompt and check if user has already responded
-// @route   GET /api/prompts/today
+// @desc    Get all of a user's written entries from all sources
+// @route   GET /api/journal
 // @access  Private
-const getDailyPrompt = asyncHandler(async (req, res) => {
-  const promptText = getPromptForDay();
+const getAllJournalEntries = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
 
-  // Check if an entry already exists for this user and this prompt today
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  // Fetch all data in parallel
+  const [dailyPromptEntries, userHabitPacks, moodLogs] = await Promise.all([
+    PromptEntry.find({ user: userId }),
+    UserHabitPack.find({ user: userId }),
+    MoodLog.find({ user: userId })
+  ]);
 
-  const existingEntry = await PromptEntry.findOne({
-    user: req.user._id,
-    prompt: promptText,
-    createdAt: { $gte: startOfToday },
+  const habitPackEntries = userHabitPacks.flatMap(pack => 
+    pack.entries.map(entry => ({
+      _id: entry._id,
+      prompt: entry.prompt,
+      response: entry.response,
+      createdAt: entry.completedAt,
+      source: 'Habit Pack',
+      parentId: pack._id 
+    }))
+  );
+
+  const allEntries = [
+    ...dailyPromptEntries.map(e => ({
+      _id: e._id,
+      prompt: e.prompt,
+      response: e.response,
+      createdAt: e.createdAt,
+      source: 'Daily Prompt',
+      parentId: null
+    })),
+    ...habitPackEntries,
+  ];
+
+  // --- THIS IS THE NEW PART ---
+  // Create a map for quick mood lookups by date
+  const moodMap = new Map();
+  moodLogs.forEach(log => {
+    const dateKey = new Date(log.createdAt).toDateString();
+    moodMap.set(dateKey, log.mood);
   });
 
-  res.json({
-    prompt: promptText,
-    entry: existingEntry, // This will be the entry object or null
+  // Attach the corresponding mood to each journal entry
+  const entriesWithMoods = allEntries.map(entry => {
+    const dateKey = new Date(entry.createdAt).toDateString();
+    return {
+      ...entry,
+      mood: moodMap.get(dateKey) || null, // Attach the mood, or null if none was logged that day
+    };
   });
+  // --- END OF NEW PART ---
+
+  entriesWithMoods.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  res.json(entriesWithMoods);
 });
 
-// @desc    Submit a response for a daily prompt
-// @route   POST /api/prompts
-// @access  Private
-const submitPromptResponse = asyncHandler(async (req, res) => {
-  const { prompt, response } = req.body;
 
-  if (!prompt || !response) {
-    res.status(400);
-    throw new Error('Prompt and response are required');
-  }
+// The updateJournalEntry function has been removed as requested.
 
-  const promptEntry = await PromptEntry.create({
-    user: req.user._id,
-    prompt,
-    response,
-  });
 
-  if (promptEntry) {
-    res.status(201).json(promptEntry);
+const deleteJournalEntry = asyncHandler(async (req, res) => {
+  const { source, parentId } = req.body;
+  const entryId = req.params.id;
+  const userId = req.user._id;
+
+  if (source === 'Daily Prompt') {
+    const entry = await PromptEntry.findById(entryId);
+    if (entry && entry.user.toString() === userId.toString()) {
+      await entry.deleteOne();
+      res.json({ message: 'Entry removed' });
+    } else {
+      res.status(404);
+      throw new Error('Entry not found or user not authorized');
+    }
+  } else if (source === 'Habit Pack') {
+    const pack = await UserHabitPack.findOne({ _id: parentId, user: userId });
+    if (pack) {
+      const entry = pack.entries.id(entryId);
+      if (entry) {
+        entry.remove();
+        await pack.save();
+        res.json({ message: 'Entry removed from pack' });
+      } else {
+        res.status(404);
+        throw new Error('Sub-entry not found in pack');
+      }
+    } else {
+      res.status(404);
+      throw new Error('Habit pack not found or user not authorized');
+    }
   } else {
     res.status(400);
-    throw new Error('Invalid prompt data');
+    throw new Error('Invalid entry source');
   }
 });
 
-// --- THIS IS THE NEW PART ---
-// @desc    Get all prompt entries for the logged-in user
-// @route   GET /api/prompts
-// @access  Private
-const getPromptEntries = asyncHandler(async (req, res) => {
-  // Find all entries that match the user's ID and sort them by creation date (newest first)
-  const entries = await PromptEntry.find({ user: req.user._id }).sort({ createdAt: -1 });
-  res.json(entries);
-});
 
-export { getDailyPrompt, submitPromptResponse, getPromptEntries };
+export { getAllJournalEntries, deleteJournalEntry };
