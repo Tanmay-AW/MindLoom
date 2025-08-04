@@ -9,7 +9,6 @@ const moods = [
   { name: 'Anxious', emoji: '😟' },
 ];
 
-// This component takes a function `onEntrySaved` to tell the parent page when it's done
 const JournalEditor = ({ onEntrySaved }) => {
   const [selectedMood, setSelectedMood] = useState(null);
   const [content, setContent] = useState('');
@@ -26,12 +25,21 @@ const JournalEditor = ({ onEntrySaved }) => {
     setError('');
 
     try {
+      // Step 1: Save the new journal entry
       const { data: newEntry } = await API.post('/journal', {
         mood: selectedMood.name,
         content: content,
       });
-      // Call the parent function to let it know a new entry was saved
+
+      // --- THIS IS THE FIX ---
+      // Step 2: After saving, immediately check for new badges
+      await API.post('/badges/check');
+      console.log("Checked for new badges after journal entry!");
+      // --- END OF FIX ---
+
+      // Step 3: Tell the parent page that the entry was saved
       onEntrySaved(newEntry);
+
     } catch (err) {
       setError('Failed to save entry. Please try again.');
     } finally {
@@ -47,7 +55,7 @@ const JournalEditor = ({ onEntrySaved }) => {
           {moods.map((mood) => (
             <button
               key={mood.name}
-              type="button" // Important to prevent form submission on click
+              type="button"
               onClick={() => setSelectedMood(mood)}
               className={`text-4xl p-3 rounded-full transition-all duration-200 ${
                 selectedMood?.name === mood.name

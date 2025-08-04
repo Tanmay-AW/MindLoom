@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import API from '../api';
 import Navbar from '../components/layout/Navbar.jsx';
 import Footer from '../components/layout/Footer.jsx';
-import * as LucideIcons from 'lucide-react'; // Import all icons from Lucide
+import * as LucideIcons from 'lucide-react';
 
 const AchievementsPage = () => {
   const [earnedBadges, setEarnedBadges] = useState([]);
@@ -13,7 +13,11 @@ const AchievementsPage = () => {
     const fetchBadges = async () => {
       try {
         const { data } = await API.get('/badges');
-        setEarnedBadges(data);
+        // --- THIS IS THE FIX ---
+        // We now safely filter out any entries where the badge data is null
+        const validBadges = data.filter(userBadge => userBadge && userBadge.badge);
+        setEarnedBadges(validBadges);
+        // --- END OF FIX ---
       } catch (err) {
         console.error('Failed to fetch badges', err);
         setError('Could not load your achievements. Please try again later.');
@@ -24,7 +28,6 @@ const AchievementsPage = () => {
     fetchBadges();
   }, []);
 
-  // Helper function to dynamically render an icon by its name string
   const renderIcon = (iconName) => {
     const IconComponent = LucideIcons[iconName];
     return IconComponent ? <IconComponent className="w-12 h-12 text-cta-orange" /> : <LucideIcons.Award className="w-12 h-12 text-cta-orange" />;

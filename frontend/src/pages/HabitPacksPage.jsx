@@ -17,7 +17,7 @@ const HabitPacksPage = () => {
       try {
         const [packsRes, activePackRes] = await Promise.all([
           API.get('/habit-packs'),
-          API.get('/habit-packs/active'),
+          API.get('/habit-packs/active')
         ]);
         setPacks(packsRes.data);
         setActivePack(activePackRes.data);
@@ -29,6 +29,19 @@ const HabitPacksPage = () => {
     };
     fetchPageData();
   }, []);
+
+  const handleStartPack = async (packId) => {
+    try {
+      await API.post(`/habit-packs/${packId}/start`);
+      navigate('/daily-task');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to start the pack.');
+    }
+  };
+
+  const handleContinuePack = () => {
+    navigate('/daily-task');
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -50,25 +63,21 @@ const HabitPacksPage = () => {
             <div className="space-y-6">
               {packs.map((pack) => {
                 const isThisPackActive = activePack && activePack.habitPack?._id === pack._id;
+                const isAnotherPackActive = activePack && !isThisPackActive;
 
                 return (
-                  <div
-                    key={pack._id}
-                    className="bg-white p-6 rounded-lg shadow-md border border-border-gray flex flex-col md:flex-row justify-between items-center"
-                  >
+                  <div key={pack._id} className="bg-white p-6 rounded-lg shadow-md border border-border-gray flex flex-col md:flex-row justify-between items-center">
                     <div>
                       <h3 className="text-2xl font-bold text-primary-text">{pack.title}</h3>
                       <p className="text-primary-text text-opacity-70 mt-1">{pack.description}</p>
-                      <p className="text-sm font-semibold text-primary-blue mt-2">
-                        {pack.duration} Days
-                      </p>
+                      <p className="text-sm font-semibold text-primary-blue mt-2">{pack.duration} Days</p>
                     </div>
-
                     <button
-                      onClick={() => navigate('/daily-task')}
-                      className="mt-4 md:mt-0 bg-cta-orange text-white font-bold py-2 px-6 rounded-md hover:bg-opacity-90 transition-all"
+                      onClick={() => isThisPackActive ? handleContinuePack() : handleStartPack(pack._id)}
+                      disabled={isAnotherPackActive} 
+                      className="mt-4 md:mt-0 bg-cta-orange text-white font-bold py-2 px-6 rounded-md hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isThisPackActive ? 'Continue Pack' : 'Start Pack'}
+                      {isThisPackActive ? 'Continue Pack' : (isAnotherPackActive ? 'Pack in Progress' : 'Start Pack')}
                     </button>
                   </div>
                 );
