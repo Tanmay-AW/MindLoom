@@ -13,7 +13,7 @@ const TaskCard = ({ title, isLocked, isComplete, children }) => {
         ) : null}
       </div>
       
-      {/* The actual task content will be rendered here */}
+      {/* The actual task content (like a text input or multiple choice) will be rendered here */}
       {!isLocked && !isComplete && (
         <div>{children}</div>
       )}

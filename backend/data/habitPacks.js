@@ -1,22 +1,53 @@
+// This is the new, flexible data structure for our habit packs
 export const packs = [
   {
-    title: 'Mental Clarity Sprint',
-    description: 'Cut through the noise and gain sharp daily focus in just 3 days.',
-    duration: 3,
-    tasks: [
+    title: 'Daily Wellness Routine',
+    description: 'A daily set of small tasks to build focus, awareness, and a positive mindset.',
+    tasksPerDay: 4, // 1 mandatory breathing exercise + 3 random tasks
+    duration: 21,
+    taskPool: [
+      // Cognitive Reframing & Emotional Awareness
       {
-        day: 1,
-        prompt: 'Brain Dump: Write down every single thought, worry, or to-do item that is currently distracting you. Get it all out.',
+        taskType: 'textInput',
+        prompt: 'Name one thing you\'re grateful for today.',
+        minWords: 5,
       },
       {
-        day: 2,
-        prompt: 'Single Priority: Look at your list from yesterday. What is the one single thing that, if completed, would make everything else feel lighter? Define your priority for today.',
+        taskType: 'textInput',
+        prompt: 'Choose a single word that defines your intention for today.',
+      },
+      // Logic & Focus
+      {
+        taskType: 'multipleChoice',
+        prompt: 'Which word doesn’t belong: Apple, Banana, Carrot, Mango?',
+        options: ['Apple', 'Banana', 'Carrot', 'Mango'],
+        correctAnswer: 'Carrot',
       },
       {
-        day: 3,
-        prompt: 'Reflection: Think about the past two days. What felt mentally "light" or clear? What was the biggest distraction you successfully set aside?',
+        taskType: 'textInput',
+        prompt: 'Unscramble this word: TSEFCOU',
+        correctAnswer: 'FOCUS',
+      },
+      // Reflection & Mindset
+      {
+        taskType: 'textInput',
+        prompt: 'Write one thing you did well recently.',
+        minWords: 5,
+      },
+      {
+        taskType: 'textInput',
+        prompt: 'Imagine a peaceful place. Describe it in 1–2 sentences.',
+      },
+      {
+        taskType: 'textInput',
+        prompt: 'What advice would your future self give you today?',
+        minWords: 5,
+      },
+      {
+        taskType: 'textInput',
+        prompt: 'Write one small act of kindness you can do today.',
+        minWords: 5,
       },
     ],
   },
-  // We can add more packs here in the future
 ];

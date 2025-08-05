@@ -1,88 +1,224 @@
 import React, { useState, useEffect } from 'react';
-import API from '../api';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar.jsx';
 import Footer from '../components/layout/Footer.jsx';
 import BreathingWidget from '../components/dashboard/BreathingWidget.jsx';
-import TaskCard from '../components/dashboard/TaskCard.jsx';
-import TextInputTask from '../components/dashboard/TextInputTask.jsx';
-import MultipleChoiceTask from '../components/dashboard/MultipleChoiceTask.jsx';
+import DayProgressBar from '../components/tasks/DayProgressBar.jsx';
+import TaskRenderer from '../components/tasks/TaskRenderer.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import API from '../api';
+import { CheckCircle, Loader2, ArrowRight } from 'lucide-react';
 
 const DailyTaskPage = () => {
   const { userInfo } = useAuth();
-  const [dailyProgress, setDailyProgress] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  
   const [isLoading, setIsLoading] = useState(true);
-
-  const fetchDailyTasks = async () => {
-    try {
-      const { data } = await API.get('/habit-packs/daily-task');
-      setDailyProgress(data);
-    } catch (err) {
-      console.error("Failed to fetch daily tasks", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [activePack, setActivePack] = useState(location.state?.activePack || null);
+  const [todaysTasks, setTodaysTasks] = useState([]);
+  const [completedTaskIds, setCompletedTaskIds] = useState([]);
+  const [breathingComplete, setBreathingComplete] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchDailyTasks();
-  }, []);
+    const fetchDailyData = async () => {
+      let packToProcess = activePack;
 
-  const handleTaskSubmit = async (taskId, response) => {
-    try {
-      const { data: updatedProgress } = await API.post('/habit-packs/submit-task', { taskId, response });
-      setDailyProgress(updatedProgress); // Update the page with the new progress
-      
-      // After the last task is done, check for badges
-      if (updatedProgress.isCompleted) {
-        API.post('/badges/check');
+      // If we don't have a pack from the navigation state, fetch it.
+      if (!packToProcess) {
+        try {
+          const { data } = await API.get('/habit-packs/active');
+          packToProcess = data;
+          setActivePack(data);
+        } catch (err) {
+          console.error("Failed to fetch active pack", err);
+          setError("Could not load your daily tasks. Please try starting a pack again.");
+          setIsLoading(false);
+          return;
+        }
       }
-    } catch (err) {
-      console.error("Failed to submit task", err);
+
+      if (packToProcess) {
+        // Find today's progress from the pack data
+        const currentDayProgress = packToProcess.dailyProgress.find(p => p.day === packToProcess.currentDay);
+        if (currentDayProgress) {
+          setTodaysTasks(currentDayProgress.tasks);
+          const initialCompleted = currentDayProgress.entries.map(e => e.taskId.toString());
+          setCompletedTaskIds(initialCompleted);
+          
+          // Check if breathing is already completed for today
+          const breathingCompleted = localStorage.getItem(`breathing_completed_${packToProcess.currentDay}`);
+          if (breathingCompleted === 'true') {
+            setBreathingComplete(true);
+          }
+        } else {
+            // This can happen on a new day before tasks are generated.
+            // Let's call the daily-task endpoint to generate them.
+            try {
+                const { data: newDayTasks } = await API.get('/habit-packs/daily-task');
+                if(newDayTasks) {
+                    setTodaysTasks(newDayTasks.tasks);
+                    setCompletedTaskIds([]); // No tasks completed yet for the new day
+                    // Refresh the whole pack data
+                    const { data: updatedPackData } = await API.get('/habit-packs/active');
+                    setActivePack(updatedPackData);
+                    
+                    // Reset breathing completion for new day
+                    setBreathingComplete(false);
+                    localStorage.removeItem(`breathing_completed_${updatedPackData.currentDay}`);
+                }
+            } catch(err) {
+                console.error("Failed to generate tasks for new day", err);
+            }
+        }
+      }
+      setIsLoading(false);
+    };
+
+    fetchDailyData();
+  }, []); // Run only once on page load
+
+  const handleBreathingComplete = () => {
+    setBreathingComplete(true);
+    if (activePack) {
+      localStorage.setItem(`breathing_completed_${activePack.currentDay}`, 'true');
     }
   };
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading Today's Focus...</div>;
-  }
+  const handleTaskComplete = async (taskId) => {
+    setCompletedTaskIds(prev => {
+      const newCompletedIds = [...new Set([...prev, taskId.toString()])];
+      
+      // Check if this was the last task to complete
+      const nonBreathingTasks = todaysTasks.filter(task => task.taskType !== 'breathing');
+      const allCompleted = nonBreathingTasks.length > 0 && 
+        nonBreathingTasks.every(task => newCompletedIds.includes(task.taskId.toString()));
+      
+      // If all tasks are now complete, trigger badge check
+      if (allCompleted && breathingComplete) {
+        // Use setTimeout to avoid blocking the UI update
+        setTimeout(async () => {
+          try {
+            await API.post('/badges/check');
+            console.log('Badge check triggered after completing all tasks');
+          } catch (err) {
+            console.error('Failed to check for badges', err);
+          }
+        }, 500);
+      }
+      
+      return newCompletedIds;
+    });
+  };
 
-  // Find the index of the last completed task
-  const lastCompletedIndex = dailyProgress ? dailyProgress.entries.length - 1 : -1;
+  const nonBreathingTasks = todaysTasks.filter(task => task.taskType !== 'breathing');
+  const allTasksDone = nonBreathingTasks.length > 0 && nonBreathingTasks.every(task => completedTaskIds.includes(task.taskId.toString()));
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary-blue" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
-      <main className="flex-grow container mx-auto px-6 py-24">
+      <main className="flex-grow container mx-auto px-6 py-16 sm:py-24">
         <div className="max-w-2xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-primary-text">Today's Focus</h1>
-            <p className="mt-2 text-lg text-primary-text text-opacity-80">Hello, {userInfo?.name}. Let's complete your daily check-in.</p>
-          </div>
+          {error && <p className="text-center text-red-500">{error}</p>}
 
-          <div className="space-y-6">
-            {/* Mandatory Breathing Widget */}
-            <BreathingWidget onComplete={() => { /* Logic to unlock next can be added if needed */ }} />
+          {!error && activePack ? (
+            <>
+              <h1 className="text-3xl sm:text-4xl font-bold text-primary-text">Today's Focus</h1>
+              <p className="mt-2 text-lg text-primary-text text-opacity-80">
+                Hello, {userInfo?.name || 'Friend'}. Let's complete your daily check-in.
+              </p>
 
-            {/* Render the list of dynamic tasks */}
-            {dailyProgress?.tasks.map((task, index) => {
-              const isLocked = index > lastCompletedIndex + 1;
-              const isComplete = dailyProgress.entries.some(entry => entry.taskId === task.taskId);
+              <DayProgressBar habitPack={activePack} />
 
-              return (
-                <TaskCard key={task.taskId} title={`Task ${index + 1}`} isLocked={isLocked} isComplete={isComplete}>
-                  {task.taskType === 'textInput' && <TextInputTask task={task} onSubmit={handleTaskSubmit} />}
-                  {task.taskType === 'multipleChoice' && <MultipleChoiceTask task={task} onSubmit={handleTaskSubmit} />}
-                </TaskCard>
-              );
-            })}
+              <div className="space-y-8 mt-8">
+                <section>
+                  <h2 className="text-2xl font-bold text-primary-text mb-4">Step 1: A Moment of Calm</h2>
+                  <div className="relative">
+                    <BreathingWidget onComplete={handleBreathingComplete} />
+                    {breathingComplete && (
+                      <div className="absolute top-0 right-0 bg-accent-green text-white px-3 py-1 rounded-full text-sm font-bold">
+                        Done!
+                      </div>
+                    )}
+                  </div>
+                </section>
 
-            {/* Completion Message */}
-            {dailyProgress?.isCompleted && (
-              <div className="bg-accent-green bg-opacity-10 text-accent-green font-semibold p-6 rounded-lg shadow-md text-center">
-                🎉 You’ve completed all your tasks for today! Come back tomorrow to continue your streak and grow stronger.
+                <section className={`transition-all duration-500 ${!breathingComplete ? 'opacity-50 pointer-events-none filter blur-sm' : 'opacity-100'}`}>
+                  <div className="flex items-center mb-4">
+                    <h2 className="text-2xl font-bold text-primary-text">Step 2: Mind Games</h2>
+                    {breathingComplete && (
+                      <ArrowRight className="ml-2 text-accent-green animate-pulse" size={20} />
+                    )}
+                  </div>
+                  
+                  {!breathingComplete ? (
+                     <div className="p-4 text-sm text-primary-text text-opacity-60 border border-dashed border-gray-300 rounded-md">
+                       Complete the breathing session to unlock your tasks.
+                     </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {todaysTasks.length > 0 ? todaysTasks.filter(task => task.taskType !== 'breathing').map((task, index) => {
+                        const isCompleted = completedTaskIds.includes(task.taskId.toString());
+                        const isUnlocked = index === 0 || completedTaskIds.includes(todaysTasks.filter(t => t.taskType !== 'breathing')[index - 1]?.taskId.toString());
+
+                        return (
+                          <div key={task.taskId} className={`transition-all duration-500 ${!isUnlocked ? 'opacity-50 pointer-events-none filter blur-sm' : 'opacity-100'}`}>
+                            <div className="flex items-center mb-2">
+                              <span className="bg-primary-blue text-white text-xs font-bold px-2 py-1 rounded-full mr-2">
+                                Task {index + 1}
+                              </span>
+                              {isCompleted && (
+                                <span className="text-accent-green text-xs font-bold">Completed!</span>
+                              )}
+                            </div>
+                            <TaskRenderer 
+                              task={task} 
+                              onComplete={handleTaskComplete}
+                              isCompleted={isCompleted}
+                            />
+                          </div>
+                        );
+                      }) : <p>No tasks for today.</p>}
+                    </div>
+                  )}
+                </section>
               </div>
-            )}
-          </div>
+
+              {allTasksDone && breathingComplete && (
+                <div className="animate-fade-in bg-white p-6 rounded-lg shadow-md border border-accent-green mt-8 text-center">
+                  <CheckCircle className="w-12 h-12 text-accent-green mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-primary-text mb-2">All Done for Today!</h2>
+                  <p className="text-primary-text text-opacity-80">
+                    Great work! You've completed all tasks for Day {activePack?.currentDay || 1} of your 21-day journey.
+                  </p>
+                  <p className="text-primary-text text-opacity-70 mt-2">
+                    Come back tomorrow to continue building your streak.
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center p-8 bg-white rounded-lg shadow-md">
+              <h1 className="text-2xl font-bold text-primary-text">No Active Habit Pack</h1>
+              <p className="mt-2 text-primary-text text-opacity-80">You haven't started a habit pack yet. Why not start one today?</p>
+              <Link to="/habit-packs" className="mt-4 inline-block bg-cta-orange text-white font-bold py-2 px-6 rounded-md hover:bg-opacity-90">
+                Browse Packs
+              </Link>
+            </div>
+          )}
         </div>
       </main>
       <Footer />

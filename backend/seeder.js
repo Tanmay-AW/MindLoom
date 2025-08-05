@@ -1,14 +1,15 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
-// Import data
+// Import all data
 import { packs } from './data/habitPacks.js';
-import { badges } from './data/badges.js';
+import { badges as streakBadges } from './data/badges.js';
+import { journalBadges } from './data/journalBadges.js';
+import { packBadges } from './data/packBadges.js';
 
-// Import models
+// Import all models
 import HabitPack from './src/models/habitPackModel.js';
 import Badge from './src/models/badgeModel.js';
-import User from './src/models/userModel.js';
 
 dotenv.config();
 
@@ -28,11 +29,13 @@ const importData = async () => {
     await HabitPack.deleteMany();
     await Badge.deleteMany();
 
+    const allBadges = [...streakBadges, ...journalBadges, ...packBadges];
+
     // Insert new data
     await HabitPack.insertMany(packs);
-    await Badge.insertMany(badges);
+    await Badge.insertMany(allBadges);
 
-    console.log('Data Imported!');
+    console.log('Data Imported Successfully!');
     process.exit();
   } catch (error) {
     console.error(`Error: ${error}`);
@@ -44,9 +47,8 @@ const destroyData = async () => {
   try {
     await HabitPack.deleteMany();
     await Badge.deleteMany();
-    // You could also clear other collections here if needed
     console.log('Data Destroyed!');
-    process.exit();
+    process.exit(1);
   } catch (error) {
     console.error(`Error: ${error}`);
     process.exit(1);

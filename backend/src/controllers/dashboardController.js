@@ -2,6 +2,7 @@ import asyncHandler from 'express-async-handler';
 import JournalEntry from '../models/journalEntryModel.js';
 import MoodLog from '../models/moodLogModel.js';
 import UserBadge from '../models/UserBadgeModel.js';
+import UserHabitPack from '../models/userHabitPackModel.js';
 
 // @desc    Get aggregated stats for the user's dashboard
 // @route   GET /api/dashboard/stats
@@ -14,10 +15,11 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   // --- Run all database queries in parallel for efficiency ---
-  const [entriesThisWeek, moodsThisWeek, achievementsCount] = await Promise.all([
+  const [entriesThisWeek, moodsThisWeek, achievementsCount, userHabitPacks] = await Promise.all([
     JournalEntry.countDocuments({ user: userId, createdAt: { $gte: sevenDaysAgo } }),
     MoodLog.find({ user: userId, createdAt: { $gte: sevenDaysAgo } }),
-    UserBadge.countDocuments({ user: userId })
+    UserBadge.countDocuments({ user: userId }),
+    UserHabitPack.find({ user: userId })
   ]);
 
   // --- Calculate Average Mood ---
@@ -29,11 +31,42 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     avgMood = Object.keys(moodToValue).find(key => moodToValue[key] === avgValue) || 'Neutral';
   }
 
+  // --- Calculate Habit Pack Task Completion Stats ---
+  let completedTasksCount = 0;
+  let activePackTitle = null;
+  let activePackProgress = 0;
+
+  if (userHabitPacks.length > 0) {
+    // Find active habit pack (assuming only one can be active at a time)
+    const activePack = userHabitPacks.find(pack => pack.status === 'in-progress');
+    
+    // Count all completed tasks across all packs
+    userHabitPacks.forEach(pack => {
+      pack.dailyProgress.forEach(day => {
+        completedTasksCount += day.entries.length;
+      });
+    });
+
+    // Calculate progress percentage for active pack
+    if (activePack) {
+      // Get the habit pack title (will need to populate in a real implementation)
+      activePackTitle = 'Active Pack';
+      
+      // Calculate progress as completed days / total days
+      const completedDays = activePack.dailyProgress.filter(day => day.isCompleted).length;
+      const totalDays = activePack.dailyProgress.length;
+      activePackProgress = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0;
+    }
+  }
+
   // --- Send all stats in a single response ---
   res.json({
     entriesThisWeek,
     avgMood,
     achievementsCount,
+    completedTasksCount,
+    activePackTitle,
+    activePackProgress
   });
 });
 

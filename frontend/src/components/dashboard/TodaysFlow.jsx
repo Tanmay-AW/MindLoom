@@ -43,7 +43,7 @@ const TodaysFlow = () => {
 
   // Step 2: If mood is logged, check for an active habit pack
   if (activeHabitPack) {
-    return <ActiveHabitPack activePackData={activePack} onTaskComplete={fetchStatus} />;
+    return <ActiveHabitPack activePackData={activeHabitPack} onTaskComplete={fetchStatus} />;
   }
 
   // Step 3: If everything is done, show the completion message

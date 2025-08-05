@@ -19,7 +19,7 @@ const protect = asyncHandler(async (req, res, next) => {
 
       // Find the user by the ID from the token and attach it to the request object
       // We exclude the password from being attached
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await User.findById(decoded._id).select('-password');
 
       next(); // Move on to the next middleware or the controller function
     } catch (error) {

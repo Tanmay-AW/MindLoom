@@ -3,9 +3,9 @@ import User from '../models/userModel.js';
 import jwt from 'jsonwebtoken';
 
 // Function to generate a JWT
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d', // Token will expire in 30 days
+const generateToken = (_id) => {
+  return jwt.sign({ _id }, process.env.JWT_SECRET, {
+    expiresIn: '30d',
   });
 };
 

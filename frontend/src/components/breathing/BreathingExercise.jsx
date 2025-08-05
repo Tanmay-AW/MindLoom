@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import API from '../../api';
 
-const BreathingWidget = ({ onComplete }) => {
+const BreathingExercise = ({ onComplete }) => {
   const [isBreathing, setIsBreathing] = useState(false);
   const [text, setText] = useState('Tap to Begin');
   const [cycles, setCycles] = useState(0);
@@ -70,7 +70,7 @@ const BreathingWidget = ({ onComplete }) => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isBreathing, hasCompletedToday]);
+  }, [isBreathing, hasCompletedToday, onComplete]);
 
   const handleStart = () => {
     setCycles(0);
@@ -83,6 +83,7 @@ const BreathingWidget = ({ onComplete }) => {
 
   return (
     <div className="flex flex-col items-center justify-center bg-white p-6 rounded-lg shadow-md border border-border-gray mt-8">
+      <h3 className="text-lg font-semibold text-blue-700 mb-4">🧘‍♂️ Breathing Exercise</h3>
       <div 
         onClick={() => !isBreathing && handleStart()}
         className="w-48 h-48 rounded-full flex items-center justify-center cursor-pointer transition-all duration-[4000ms] ease-in-out"
@@ -95,16 +96,24 @@ const BreathingWidget = ({ onComplete }) => {
           {isBreathing ? text : hasCompletedToday ? 'Done!' : 'Tap to Begin'}
         </span>
       </div>
-      <p className={`mt-4 text-primary-text text-opacity-70 transition-colors duration-500 ${hasCompletedToday ? 'text-green-600 font-semibold' : ''}`}>
-          {hasCompletedToday 
-          ? "Nice work! You’ve completed 3 calming cycles."
-          : isBreathing 
+      <p className="mt-4 text-primary-text text-opacity-70">
+        {isBreathing 
           ? `Breath ${cycles} of ${TOTAL_CYCLES}` 
-          : 'A moment of calm is just a breath away.'
-        }
+          : hasCompletedToday 
+            ? "Nice work! You've completed 3 calming cycles."
+            : 'A moment of calm is just a breath away.'}
       </p>
+      
+      {cycles >= TOTAL_CYCLES && !isBreathing && !hasCompletedToday && (
+        <button
+          onClick={onComplete}
+          className="mt-4 bg-green-600 text-white py-2 px-5 rounded-md font-semibold hover:bg-green-700"
+        >
+          Complete Exercise
+        </button>
+      )}
     </div>
   );
 };
 
-export default BreathingWidget;
+export default BreathingExercise;
