@@ -13,6 +13,7 @@ const DashboardPage = () => {
   const { userInfo } = useAuth();
   const [recentActivity, setRecentActivity] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   useEffect(() => {
     const fetchRecentActivity = async () => {
@@ -26,21 +27,7 @@ const DashboardPage = () => {
       }
     };
     
-    // For now, we'll use mock data since the endpoint might not exist yet
-    const mockData = [
-      { type: 'journal', title: 'Added a journal entry', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000) },
-      { type: 'mood', title: 'Logged mood as Happy', timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000) },
-      { type: 'task', title: 'Completed breathing exercise', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
-    ];
-    
-    // Simulate API call
-    setTimeout(() => {
-      setRecentActivity(mockData);
-      setIsLoading(false);
-    }, 500);
-    
-    // Uncomment when endpoint is ready
-    // fetchRecentActivity();
+    fetchRecentActivity();
   }, []);
 
   const getGreeting = () => {
@@ -111,9 +98,14 @@ const DashboardPage = () => {
           <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-primary-text">Recent Activity</h2>
-              <Link to="/achievements" className="text-sm text-primary-blue hover:underline flex items-center">
-                View all <ArrowRight className="ml-1 w-4 h-4" />
-              </Link>
+              {recentActivity.length > 3 && (
+                <button
+                  className="text-sm text-primary-blue hover:underline flex items-center focus:outline-none"
+                  onClick={() => setShowAllActivity((prev) => !prev)}
+                >
+                  {showAllActivity ? 'Show less' : 'View all'} <ArrowRight className="ml-1 w-4 h-4" />
+                </button>
+              )}
             </div>
             
             {isLoading ? (
@@ -123,7 +115,7 @@ const DashboardPage = () => {
               </div>
             ) : recentActivity.length > 0 ? (
               <div className="bg-white rounded-lg shadow-md border border-border-gray divide-y divide-gray-100">
-                {recentActivity.map((activity, index) => (
+                {(showAllActivity ? recentActivity : recentActivity.slice(0, 3)).map((activity, index) => (
                   <div key={index} className="p-4 flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="bg-primary-blue bg-opacity-10 p-2 rounded-full mr-3">

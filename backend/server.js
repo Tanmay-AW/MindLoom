@@ -14,6 +14,7 @@ import calmBotRoutes from './src/routes/calmBotRoutes.js';
 import habitPackRoutes from './src/routes/habitPackRoutes.js';
 import badgeRoutes from './src/routes/badgeRoutes.js';
 import dashboardRoutes from './src/routes/dashboardRoutes.js';
+import recentActivityRoutes from './src/routes/recentActivityRoutes.js';
 import breathingRoutes from './src/routes/breathingRoutes.js';
 
 import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
@@ -48,6 +49,7 @@ app.use('/api/calmbot', calmBotRoutes);
 app.use('/api/habit-packs', habitPackRoutes); // This line should be present
 app.use('/api/badges', badgeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/dashboard/recent-activity', recentActivityRoutes);
 app.use('/api/breathing', breathingRoutes);
 
 // --- Error Middleware ---

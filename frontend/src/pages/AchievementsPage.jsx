@@ -132,10 +132,19 @@ const AchievementsPage = () => {
         
         // First fetch badges
         console.log('Fetching badges...');
-        const { data } = await API.get('/badges');
+        let { data } = await API.get('/badges');
         console.log('Badges fetched successfully:', data);
-        
-        const validBadges = data.filter(userBadge => userBadge?.badge);
+        if (!Array.isArray(data) || data.length === 0) {
+          console.warn('No badges returned from backend. Raw response:', data);
+        } else {
+          data.forEach((badgeObj, idx) => {
+            console.log(`Badge[${idx}]:`, badgeObj);
+          });
+        }
+        let validBadges = data.filter(userBadge => userBadge?.badge);
+        if (validBadges.length === 0) {
+          console.warn('No valid badges with a badge property found in backend response.');
+        }
         setEarnedBadges(validBadges);
         
         // Then trigger a check for any new badges
@@ -143,25 +152,38 @@ const AchievementsPage = () => {
         await API.post('/badges/check');
         console.log('Badge check completed');
         
+        // Re-fetch badges to get any new ones just awarded
+        ({ data } = await API.get('/badges'));
+        console.log('Badges re-fetched after badge check:', data);
+        if (!Array.isArray(data) || data.length === 0) {
+          console.warn('No badges returned from backend after badge check. Raw response:', data);
+        } else {
+          data.forEach((badgeObj, idx) => {
+            console.log(`[After Check] Badge[${idx}]:`, badgeObj);
+          });
+        }
+        validBadges = data.filter(userBadge => userBadge?.badge);
+        if (validBadges.length === 0) {
+          console.warn('No valid badges with a badge property found in backend response after badge check.');
+        }
+        setEarnedBadges(validBadges);
+        
         // Categorize badges by type
         const categorized = {
           streak: [],
           journal: [],
           pack: []
         };
-        
         validBadges.forEach(userBadge => {
           if (userBadge.badge && userBadge.badge.type) {
             categorized[userBadge.badge.type].push(userBadge);
           }
         });
-        
         setCategorizedBadges(categorized);
       } catch (err) {
         console.error('Failed to fetch badges', err);
         console.error('Error details:', err.response?.data || err.message);
         setError('Could not load your achievements. Please try again later.');
-        
         // If API call fails, show sample data after a short delay
         setTimeout(() => {
           if (isLoading) {

@@ -10,12 +10,18 @@ const startPack = asyncHandler(async (req, res) => {
   const packId = req.params.id;
   console.log(`[BACKEND] 2. 'startPack' controller hit for user: ${userId}`);
 
-  const existingPack = await UserHabitPack.findOne({ user: userId, status: 'in-progress' });
+  // Remove any broken packs with habitPack: null or missing
+  await UserHabitPack.deleteMany({ user: userId, status: 'in-progress', $or: [ { habitPack: null }, { habitPack: { $exists: false } } ] });
 
-  if (existingPack) {
-    console.log('[BACKEND] 3a. Found existing pack. Returning it.');
+  // Re-query for a valid existing pack
+  let existingPack = await UserHabitPack.findOne({ user: userId, status: 'in-progress' }).populate('habitPack');
+  if (existingPack && existingPack.habitPack) {
+    console.log('[BACKEND] 3a. Found existing valid pack. Returning it.');
     res.status(200).json(existingPack);
     return;
+  } else if (existingPack && !existingPack.habitPack) {
+    // Defensive: delete this broken pack and continue to create a new one
+    await UserHabitPack.deleteOne({ _id: existingPack._id });
   }
 
   console.log('[BACKEND] 3b. No existing pack found. Creating a new one.');
@@ -46,14 +52,14 @@ const startPack = asyncHandler(async (req, res) => {
   // Combine breathing task with random tasks
   const todayTasks = [breathingTask, ...randomTasks];
 
-  const userHabitPack = await UserHabitPack.create({
+  let userHabitPack = await UserHabitPack.create({
     user: userId,
     habitPack: packId,
     dailyProgress: [{ day: 1, tasks: todayTasks }],
     startDate: new Date(),
     status: 'in-progress',
   });
-
+  userHabitPack = await userHabitPack.populate('habitPack');
   console.log('[BACKEND] 3c. New pack created in DB with status:', userHabitPack.status);
   res.status(201).json(userHabitPack);
 });
@@ -62,8 +68,16 @@ const startPack = asyncHandler(async (req, res) => {
 const getActivePack = asyncHandler(async (req, res) => {
   console.log(`[BACKEND] 7. 'getActivePack' controller hit for user: ${req.user._id}`);
 
-  const activePack = await UserHabitPack.findOne({ user: req.user._id, status: 'in-progress' })
-    .populate('habitPack');
+  // Remove any broken packs with habitPack: null or missing
+  await UserHabitPack.deleteMany({ user: req.user._id, status: 'in-progress', $or: [ { habitPack: null }, { habitPack: { $exists: false } } ] });
+
+  let activePack = await UserHabitPack.findOne({ user: req.user._id, status: 'in-progress' }).populate('habitPack');
+
+  // Defensive: if a broken pack is still found, delete and re-query
+  if (activePack && !activePack.habitPack) {
+    await UserHabitPack.deleteOne({ _id: activePack._id });
+    activePack = await UserHabitPack.findOne({ user: req.user._id, status: 'in-progress' }).populate('habitPack');
+  }
 
   console.log(`[BACKEND] 7b. DB query result for active pack:`, activePack);
 

@@ -39,23 +39,20 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   if (userHabitPacks.length > 0) {
     // Find active habit pack (assuming only one can be active at a time)
     const activePack = userHabitPacks.find(pack => pack.status === 'in-progress');
-    
     // Count all completed tasks across all packs
     userHabitPacks.forEach(pack => {
       pack.dailyProgress.forEach(day => {
         completedTasksCount += day.entries.length;
       });
     });
-
     // Calculate progress percentage for active pack
     if (activePack) {
-      // Get the habit pack title (will need to populate in a real implementation)
+      // Get the habit pack title (populate if needed)
       activePackTitle = 'Active Pack';
-      
-      // Calculate progress as completed days / total days
+      // Use the full duration of the pack for progress
       const completedDays = activePack.dailyProgress.filter(day => day.isCompleted).length;
-      const totalDays = activePack.dailyProgress.length;
-      activePackProgress = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0;
+      const totalDays = activePack.habitPack && activePack.habitPack.duration ? activePack.habitPack.duration : 21;
+      activePackProgress = Math.round((completedDays / totalDays) * 100);
     }
   }
 
