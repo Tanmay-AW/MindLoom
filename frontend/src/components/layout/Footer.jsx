@@ -29,23 +29,26 @@ const Footer = () => {
         {/* Social Icons */}
         <div className="flex justify-center gap-6 mt-8">
           <a
-            href="#"
+            href="https://www.linkedin.com/in/tanmaygunwantdev"
             aria-label="LinkedIn"
             className="text-gray-400 hover:text-white transition-colors duration-300"
+            target="_blank" rel="noopener noreferrer"
           >
             <Linkedin size={20} />
           </a>
           <a
-            href="#"
+            href="https://github.com/Tanmay-AW/MindLoom.git"
             aria-label="GitHub"
             className="text-gray-400 hover:text-white transition-colors duration-300"
+            target="_blank" rel="noopener noreferrer"
           >
             <Github size={20} />
           </a>
           <a
-            href="#"
+            href="https://x.com/tanmay_gunwant"
             aria-label="X (formerly Twitter)"
             className="text-gray-400 hover:text-white transition-colors duration-300"
+            target="_blank" rel="noopener noreferrer"
           >
             <XIcon />
           </a>
