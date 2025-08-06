@@ -4,7 +4,8 @@ import bcrypt from 'bcryptjs';
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true,
+    // Name is not required until the final registration step
+    required: false, 
   },
   email: {
     type: String,
@@ -13,14 +14,31 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    // Password is not required until the final registration step
+    required: false, 
   },
+  // --- NEW FIELDS FOR OTP VERIFICATION ---
+  otp: {
+    type: String,
+    required: false,
+  },
+  otpExpires: {
+    type: Date,
+    required: false,
+  },
+  isVerified: {
+    type: Boolean,
+    required: true,
+    default: false,
+  },
+  // --- END OF NEW FIELDS ---
 }, {
   timestamps: true,
 });
 
-// Hashes password before saving a new user
+// Hashes password before saving
 userSchema.pre('save', async function (next) {
+  // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) {
     return next();
   }
@@ -29,12 +47,12 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-// --- THIS IS THE CRUCIAL PART ---
-// This correctly attaches the matchPassword function to every user document
+// Method to compare entered password with the hashed password in the DB
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  // Check if a password exists for this user before comparing
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
-// --- END OF CRUCIAL PART ---
 
 const User = mongoose.model('User', userSchema);
 

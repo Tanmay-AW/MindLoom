@@ -1,9 +1,10 @@
-// --- CHANGE 1: Import `lazy` and `Suspense` from React ---
-import React, { lazy, Suspense } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { Loader2 } from 'lucide-react'; // For our loading spinner
+import React, { lazy, Suspense, useEffect } from 'react';
+// --- CHANGE 1: Import hooks for navigation and context ---
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from './contexts/AuthContext.jsx'; 
+import { Loader2 } from 'lucide-react';
 
-// --- CHANGE 2: Keep the HomePage as a normal import, but change all others to use `lazy` ---
+// Lazy loaded pages (no changes here)
 import HomePage from './pages/HomePage.jsx';
 const SignupPage = lazy(() => import('./pages/SignupPage.jsx'));
 const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
@@ -18,18 +19,46 @@ const DailyTaskPage = lazy(() => import('./pages/DailyTaskPage.jsx'));
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx';
 import FloatingCoachButton from './components/common/FloatingCoachButton.jsx';
 
-// --- CHANGE 3: Create a simple loading component to show while new pages load ---
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center">
     <Loader2 className="h-12 w-12 animate-spin text-primary-blue" />
   </div>
 );
 
-
 function App() {
+  // --- CHANGE 2: Get necessary functions from hooks ---
+  const { setUserInfo } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // --- CHANGE 3: Add a useEffect to handle the Google Auth redirect ---
+useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+
+    if (token) {
+      // Now we also get the name, email, and id from the URL
+      const name = params.get('name');
+      const email = params.get('email');
+      const id = params.get('id');
+
+      // Construct the complete user object
+      const userData = {
+        _id: id,
+        name: name,
+        email: email,
+        token: token,
+      };
+
+      // Save the complete user object to global state
+      setUserInfo(userData);
+      navigate('/dashboard', { replace: true });
+    }
+  }, [location, setUserInfo, navigate]);
+
+
   return (
     <>
-      {/* --- CHANGE 4: Wrap your entire <Routes> component in a <Suspense> boundary --- */}
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public Routes */}

@@ -4,6 +4,8 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import passport from 'passport'; // 1. Import Passport
+import configurePassport from './src/config/passport.js'; // 2. Import our new passport config
 
 // Import all routes
 import userRoutes from './src/routes/userRoutes.js';
@@ -23,6 +25,11 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// --- 3. Initialize Passport ---
+configurePassport();
+app.use(passport.initialize());
+// --- End of Passport Initialization ---
 
 const connectDB = async () => {
   try {
@@ -46,7 +53,7 @@ app.use('/api/moods', moodRoutes);
 app.use('/api/journal', journalRoutes);
 app.use('/api/streaks', streakRoutes);
 app.use('/api/calmbot', calmBotRoutes);
-app.use('/api/habit-packs', habitPackRoutes); // This line should be present
+app.use('/api/habit-packs', habitPackRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/dashboard/recent-activity', recentActivityRoutes);

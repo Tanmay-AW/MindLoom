@@ -1,13 +1,34 @@
 import express from 'express';
-import { registerUser, loginUser } from '../controllers/userController.js';
+import passport from 'passport';
+import { 
+  registerUser, 
+  loginUser, 
+  sendOtp,
+  // verifyOtp is no longer needed
+  googleAuthCallback
+} from '../controllers/userController.js';
 
 const router = express.Router();
 
-// When a POST request is made to '/register', call the registerUser function
+// Email & Password Routes
 router.post('/register', registerUser);
-
-// When a POST request is made to '/login', call the loginUser function
 router.post('/login', loginUser);
+router.post('/send-otp', sendOtp);
+// The /verify-otp route is now removed
 
+// Google OAuth Routes (with session disabled)
+router.get('/google', passport.authenticate('google', { 
+  scope: ['profile', 'email'], 
+  session: false 
+}));
+
+router.get(
+  '/google/callback', 
+  passport.authenticate('google', { 
+    failureRedirect: '/login', 
+    session: false 
+  }),
+  googleAuthCallback
+);
 
 export default router;
