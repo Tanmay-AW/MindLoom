@@ -51,7 +51,7 @@ const LoginPage = () => {
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Google Log In Button */}
             <button type="button" >
-              <a href="http://localhost:5000/api/users/google" className="w-full flex items-center justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-md font-medium text-gray-700 bg-white hover:bg-gray-50">
+              <a href="https://mindloom-backend.onrender.com/api/users/google" className="w-full flex items-center justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-md font-medium text-gray-700 bg-white hover:bg-gray-50">
                 <img src="https://www.google.com/favicon.ico" alt="Google icon" className="w-5 h-5 mr-3" />
                 Log in with Google
               </a>
