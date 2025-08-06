@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // 1. Import useCallback
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar.jsx';
 import Footer from '../components/layout/Footer.jsx';
@@ -21,63 +21,61 @@ const DailyTaskPage = () => {
   const [breathingComplete, setBreathingComplete] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const fetchDailyData = async () => {
-      let packToProcess = activePack;
+  // --- CHANGE 1: Moved the fetching logic into a useCallback function ---
+  const fetchDailyData = useCallback(async () => {
+    // We don't want to show the loader on re-fetch, only on initial load.
+    // setIsLoading(true) is only called on initial useEffect.
+    
+    let packToProcess = activePack;
 
-      // If we don't have a pack from the navigation state, fetch it.
-      if (!packToProcess) {
+    if (!packToProcess) {
+      try {
+        const { data } = await API.get('/habit-packs/active');
+        packToProcess = data;
+      } catch (err) {
+        console.error("Failed to fetch active pack", err);
+        setError("Could not load your daily tasks. Please try starting a pack again.");
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    if (packToProcess) {
+      const { data: updatedPackData } = await API.get('/habit-packs/active');
+      setActivePack(updatedPackData);
+      
+      const currentDayProgress = updatedPackData.dailyProgress.find(p => p.day === updatedPackData.currentDay);
+      if (currentDayProgress) {
+        setTodaysTasks(currentDayProgress.tasks);
+        const initialCompleted = currentDayProgress.entries.map(e => e.taskId.toString());
+        setCompletedTaskIds(initialCompleted);
+        
+        const breathingCompleted = localStorage.getItem(`breathing_completed_${updatedPackData.currentDay}`);
+        if (breathingCompleted === 'true') {
+          setBreathingComplete(true);
+        }
+      } else {
         try {
-          const { data } = await API.get('/habit-packs/active');
-          packToProcess = data;
-          setActivePack(data);
-        } catch (err) {
-          console.error("Failed to fetch active pack", err);
-          setError("Could not load your daily tasks. Please try starting a pack again.");
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      if (packToProcess) {
-        // Find today's progress from the pack data
-        const currentDayProgress = packToProcess.dailyProgress.find(p => p.day === packToProcess.currentDay);
-        if (currentDayProgress) {
-          setTodaysTasks(currentDayProgress.tasks);
-          const initialCompleted = currentDayProgress.entries.map(e => e.taskId.toString());
-          setCompletedTaskIds(initialCompleted);
-          
-          // Check if breathing is already completed for today
-          const breathingCompleted = localStorage.getItem(`breathing_completed_${packToProcess.currentDay}`);
-          if (breathingCompleted === 'true') {
-            setBreathingComplete(true);
+          const { data: newDayTasks } = await API.get('/habit-packs/daily-task');
+          if(newDayTasks) {
+            const { data: finalPackData } = await API.get('/habit-packs/active');
+            setActivePack(finalPackData);
+            setTodaysTasks(newDayTasks.tasks);
+            setCompletedTaskIds([]);
+            setBreathingComplete(false);
+            localStorage.removeItem(`breathing_completed_${finalPackData.currentDay}`);
           }
-        } else {
-            // This can happen on a new day before tasks are generated.
-            // Let's call the daily-task endpoint to generate them.
-            try {
-                const { data: newDayTasks } = await API.get('/habit-packs/daily-task');
-                if(newDayTasks) {
-                    setTodaysTasks(newDayTasks.tasks);
-                    setCompletedTaskIds([]); // No tasks completed yet for the new day
-                    // Refresh the whole pack data
-                    const { data: updatedPackData } = await API.get('/habit-packs/active');
-                    setActivePack(updatedPackData);
-                    
-                    // Reset breathing completion for new day
-                    setBreathingComplete(false);
-                    localStorage.removeItem(`breathing_completed_${updatedPackData.currentDay}`);
-                }
-            } catch(err) {
-                console.error("Failed to generate tasks for new day", err);
-            }
+        } catch(err) {
+          console.error("Failed to generate tasks for new day", err);
         }
       }
-      setIsLoading(false);
-    };
+    }
+    setIsLoading(false);
+  }, []); // useCallback dependencies
 
+  useEffect(() => {
     fetchDailyData();
-  }, []); // Run only once on page load
+  }, [fetchDailyData]); // Run only once on page load
 
   const handleBreathingComplete = () => {
     setBreathingComplete(true);
@@ -86,30 +84,29 @@ const DailyTaskPage = () => {
     }
   };
 
+  // --- CHANGE 2: Updated handleTaskComplete to refetch data ---
   const handleTaskComplete = async (taskId) => {
-    setCompletedTaskIds(prev => {
-      const newCompletedIds = [...new Set([...prev, taskId.toString()])];
-      
-      // Check if this was the last task to complete
-      const nonBreathingTasks = todaysTasks.filter(task => task.taskType !== 'breathing');
-      const allCompleted = nonBreathingTasks.length > 0 && 
-        nonBreathingTasks.every(task => newCompletedIds.includes(task.taskId.toString()));
-      
-      // If all tasks are now complete, trigger badge check
-      if (allCompleted && breathingComplete) {
-        // Use setTimeout to avoid blocking the UI update
-        setTimeout(async () => {
-          try {
-            await API.post('/badges/check');
-            console.log('Badge check triggered after completing all tasks');
-          } catch (err) {
-            console.error('Failed to check for badges', err);
-          }
-        }, 500);
-      }
-      
-      return newCompletedIds;
-    });
+    // Optimistically update the local state for instant UI feedback
+    setCompletedTaskIds(prev => [...new Set([...prev, taskId.toString()])]);
+
+    // Re-fetch all data from the server to ensure UI is fully synced
+    await fetchDailyData();
+
+    // Check for badges after the data has been confirmed and updated
+    const allTasksNowDone = todaysTasks.length > 0 && 
+      todaysTasks.filter(t => t.taskType !== 'breathing')
+                 .every(task => [...completedTaskIds, taskId.toString()].includes(task.taskId.toString()));
+
+    if (allTasksNowDone && breathingComplete) {
+      setTimeout(async () => {
+        try {
+          await API.post('/badges/check');
+          console.log('Badge check triggered after completing all tasks');
+        } catch (err) {
+          console.error('Failed to check for badges', err);
+        }
+      }, 500);
+    }
   };
 
   const nonBreathingTasks = todaysTasks.filter(task => task.taskType !== 'breathing');
@@ -127,6 +124,7 @@ const DailyTaskPage = () => {
     );
   }
 
+  // ... rest of the component's return statement (no changes there)
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
@@ -165,9 +163,9 @@ const DailyTaskPage = () => {
                   </div>
                   
                   {!breathingComplete ? (
-                     <div className="p-4 text-sm text-primary-text text-opacity-60 border border-dashed border-gray-300 rounded-md">
-                       Complete the breathing session to unlock your tasks.
-                     </div>
+                      <div className="p-4 text-sm text-primary-text text-opacity-60 border border-dashed border-gray-300 rounded-md">
+                        Complete the breathing session to unlock your tasks.
+                      </div>
                   ) : (
                     <div className="space-y-4">
                       {todaysTasks.length > 0 ? todaysTasks.filter(task => task.taskType !== 'breathing').map((task, index) => {

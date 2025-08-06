@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react'; // Import the X icon
-import heroImage from '../assets/images/hero-image.jpg';
+import heroImage from '../assets/images/hero-image.webp';
 import API from '../api';
 import { useAuth } from '../contexts/AuthContext.jsx'; // Import the useAuth hook
 

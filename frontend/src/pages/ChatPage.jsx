@@ -56,7 +56,7 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
       {/* --- THIS IS THE FIX --- */}
       {/* We add top padding here and remove overflow-hidden */}

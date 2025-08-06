@@ -1,51 +1,61 @@
 import React from 'react';
-import { Twitter, Linkedin, Instagram } from 'lucide-react';
+import { Linkedin, Github } from 'lucide-react';
+
+const XIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 512 512"
+    width="20"
+    height="20"
+    fill="currentColor"
+  >
+    <path d="M461.2 32H365.3L256 196.6 146.7 32H50.8l146 210.6L38.4 480h96.9L256 314.9 376.7 480h96.9L329.2 242.6z"/>
+  </svg>
+);
 
 const Footer = () => {
   return (
-    // FIXED: Background now uses the correct brand-navy color.
-    <footer className="bg-brand-navy text-background">
-      <div className="container mx-auto px-6 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div className="col-span-2 md:col-span-1">
-            <h3 className="text-2xl font-bold mb-2">MindLoom</h3>
-            <p className="text-background text-opacity-80">
-              Building stronger minds, one day at a time.
-            </p>
-          </div>
-          <div>
-            <h4 className="font-bold mb-4">Product</h4>
-            <ul className="space-y-2">
-              <li><a href="#features" className="hover:text-opacity-100 text-opacity-80 transition">Features</a></li>
-              <li><a href="#about" className="hover:text-opacity-100 text-opacity-80 transition">About Us</a></li>
-              <li><a href="#pricing" className="hover:text-opacity-100 text-opacity-80 transition">Pricing</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-bold mb-4">Community</h4>
-            <ul className="space-y-2">
-              <li><a href="#blog" className="hover:text-opacity-100 text-opacity-80 transition">Blog</a></li>
-              <li><a href="#newsletter" className="hover:text-opacity-100 text-opacity-80 transition">Newsletter</a></li>
-              <li><a href="#events" className="hover:text-opacity-100 text-opacity-80 transition">Events</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-bold mb-4">Legal</h4>
-            <ul className="space-y-2">
-              <li><a href="#privacy" className="hover:text-opacity-100 text-opacity-80 transition">Privacy Policy</a></li>
-              <li><a href="#terms" className="hover:text-opacity-100 text-opacity-80 transition">Terms of Service</a></li>
-            </ul>
-          </div>
+    <footer className="bg-[#1E1E1E] text-gray-300">
+      <div className="max-w-4xl mx-auto px-6 py-16 text-center">
+
+        {/* About Section */}
+        <h3 className="text-xl font-semibold text-white mb-4">About MindLoom</h3>
+        <p className="text-base text-gray-400 leading-relaxed">
+          MindLoom is your personal mental fitness coach—built for students, creators, and professionals
+          who want to build mental clarity and resilience in just 5 minutes a day.
+          We’re on a mission to make mental strength a daily habit.
+        </p>
+
+        {/* Social Icons */}
+        <div className="flex justify-center gap-6 mt-8">
+          <a
+            href="#"
+            aria-label="LinkedIn"
+            className="text-gray-400 hover:text-white transition-colors duration-300"
+          >
+            <Linkedin size={20} />
+          </a>
+          <a
+            href="#"
+            aria-label="GitHub"
+            className="text-gray-400 hover:text-white transition-colors duration-300"
+          >
+            <Github size={20} />
+          </a>
+          <a
+            href="#"
+            aria-label="X (formerly Twitter)"
+            className="text-gray-400 hover:text-white transition-colors duration-300"
+          >
+            <XIcon />
+          </a>
         </div>
-        <div className="mt-12 pt-8 border-t border-background border-opacity-20 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-background text-opacity-70 text-sm mb-4 md:mb-0">
-            © 2025 MindLoom. All rights reserved.
+
+        {/* Bottom Line */}
+        <div className="mt-16 pt-8 border-t border-gray-700 text-center">
+          <p className="text-sm text-gray-500">
+            © {new Date().getFullYear()} MindLoom: Because screaming into a pillow isn’t scalable.
           </p>
-          <div className="flex space-x-4">
-            <a href="#" className="text-background text-opacity-70 hover:text-opacity-100 transition"><Twitter size={20} /></a>
-            <a href="#" className="text-background text-opacity-70 hover:text-opacity-100 transition"><Linkedin size={20} /></a>
-            <a href="#" className="text-background text-opacity-70 hover:text-opacity-100 transition"><Instagram size={20} /></a>
-          </div>
         </div>
       </div>
     </footer>

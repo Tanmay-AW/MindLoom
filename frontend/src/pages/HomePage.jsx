@@ -2,10 +2,11 @@ import React from 'react';
 import Navbar from '../components/layout/Navbar.jsx';
 import HeroSection from '../components/common/HeroSection.jsx';
 import FeaturesSection from '../components/common/FeaturesSection.jsx';
-import TestimonialsSection from '../components/common/TestimonialsSection.jsx';
+// --- CHANGE HERE: Import HowItWorksSection instead of TestimonialsSection ---
+import HowItWorksSection from '../components/common/HowItWorksSection.jsx';
 import Footer from '../components/layout/Footer.jsx';
-import heroImage from '../assets/images/hero-image.jpg';
-import AnimatedSection from '../components/animations/AnimatedSection.jsx'; // 1. Import the animation component
+import heroImage from '../assets/images/hero-image.webp';
+import AnimatedSection from '../components/animations/AnimatedSection.jsx';
 
 const HomePage = () => {
   return (
@@ -20,14 +21,13 @@ const HomePage = () => {
       <main>
         <HeroSection />
         
-        {/* 2. Wrap the FeaturesSection with the animation component */}
         <AnimatedSection>
           <FeaturesSection />
         </AnimatedSection>
 
-        {/* 3. Wrap the TestimonialsSection with the animation component */}
+        {/* --- CHANGE HERE: Use HowItWorksSection instead of TestimonialsSection --- */}
         <AnimatedSection>
-          <TestimonialsSection />
+          <HowItWorksSection />
         </AnimatedSection>
 
       </main>
