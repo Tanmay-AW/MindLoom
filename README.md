@@ -2,6 +2,8 @@
 
 **MindLoom** is a full-stack MERN (MongoDB, Express, React, Node.js) application designed to help users build emotional resilience through daily habits, reflection, and AI-guided journaling.
 
+Live - https://mindloom-ecru.vercel.app
+
 ## ✨ Key Features
 - ✅ User Authentication (JWT-secured)
 - 📈 Mood Tracking & Visual Timeline
