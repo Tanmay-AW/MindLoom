@@ -50,7 +50,7 @@ function ReflectBackground() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const gl = canvas.getContext("webgl", { antialias: true });
+    const gl = canvas.getContext("webgl", { antialias: true, preserveDrawingBuffer: true });
     if (!gl) {
       console.error("WebGL not supported");
       return;
@@ -58,12 +58,10 @@ function ReflectBackground() {
 
     const compileShader = (type, source) => {
       const shader = gl.createShader(type);
-      if (!shader) return null;
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error("Shader compilation error:", gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
+        console.error(gl.getShaderInfoLog(shader));
         return null;
       }
       return shader;
@@ -71,19 +69,15 @@ function ReflectBackground() {
 
     const vertexShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
-    if (!vertexShader || !fragmentShader) return;
-
     const program = gl.createProgram();
-    if (!program) return;
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error("Program linking error:", gl.getProgramInfoLog(program));
+      console.error(gl.getProgramInfoLog(program));
       return;
     }
-
     gl.useProgram(program);
 
     const positionBuffer = gl.createBuffer();
@@ -101,47 +95,42 @@ function ReflectBackground() {
     const iResolutionLocation = gl.getUniformLocation(program, "iResolution");
     const iTimeLocation = gl.getUniformLocation(program, "iTime");
 
-    let startTime = Date.now();
-    let animationFrameId;
+    let startTime = performance.now();
 
     const resizeCanvas = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const width = Math.round(window.innerWidth * dpr);
-      const height = Math.round(window.innerHeight * dpr);
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-        gl.viewport(0, 0, width, height);
-      }
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5); // Cap for performance
+      const width = Math.floor(window.innerWidth * dpr);
+      const height = Math.floor(window.innerHeight * dpr);
+      canvas.width = width;
+      canvas.height = height;
+      gl.viewport(0, 0, width, height);
     };
 
-    const render = () => {
+    const render = (time) => {
       resizeCanvas();
-      const currentTime = (Date.now() - startTime) / 1000;
+      gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform2f(iResolutionLocation, canvas.width, canvas.height);
-      gl.uniform1f(iTimeLocation, currentTime);
+      gl.uniform1f(iTimeLocation, (time - startTime) / 1000);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-      animationFrameId = requestAnimationFrame(render);
+      requestAnimationFrame(render);
     };
 
-    render();
+    resizeCanvas();
+    render(performance.now());
 
     window.addEventListener("resize", resizeCanvas);
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", resizeCanvas);
-    };
+    return () => window.removeEventListener("resize", resizeCanvas);
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
       style={{
-        position: "absolute",
+        position: "fixed",
         top: 0,
         left: 0,
-        width: "100vw",
-        height: "100vh",
+        width: "100%",
+        height: "100%",
         display: "block",
         zIndex: -1
       }}
