@@ -18,4 +18,3 @@
 - **AI**: Google Gemini 1.5 Flash API  
 - **Charting**: Recharts
 
-## 🚀 Getting Started
