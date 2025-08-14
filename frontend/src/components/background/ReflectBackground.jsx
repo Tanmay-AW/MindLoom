@@ -15,8 +15,11 @@ uniform float iTime;
 #define MAX_ITER 5
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    // Slightly quantize coordinates to prevent dancing noise
+    vec2 coord = floor(fragCoord.xy) + 0.5;
+
     float time = iTime * 0.1 + 23.0;
-    vec2 uv = fragCoord.xy / iResolution.xy;
+    vec2 uv = coord / iResolution.xy;
     vec2 p = mod(uv * TAU, TAU) - 250.0;
     vec2 i = vec2(p);
     float c = 1.0;
@@ -61,7 +64,8 @@ function ReflectBackground() {
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(shader));
+        console.error("Shader error:", gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
         return null;
       }
       return shader;
@@ -75,18 +79,18 @@ function ReflectBackground() {
     gl.linkProgram(program);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error(gl.getProgramInfoLog(program));
+      console.error("Program link error:", gl.getProgramInfoLog(program));
       return;
     }
+
     gl.useProgram(program);
 
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
-      gl.STATIC_DRAW
-    );
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,  1, -1,  -1, 1,
+      -1, 1,   1, -1,   1, 1
+    ]), gl.STATIC_DRAW);
 
     const positionLocation = gl.getAttribLocation(program, "a_position");
     gl.enableVertexAttribArray(positionLocation);
@@ -95,38 +99,52 @@ function ReflectBackground() {
     const iResolutionLocation = gl.getUniformLocation(program, "iResolution");
     const iTimeLocation = gl.getUniformLocation(program, "iTime");
 
-    let startTime = performance.now();
+    let startTime = Date.now();
+    let animationFrameId;
+    let lastFrameTime = 0;
+    const targetFPS = /Mobi|Android/i.test(navigator.userAgent) ? 20 : 60; // mobile = slower fps
 
     const resizeCanvas = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2.5); // Cap for performance
-      const width = Math.floor(window.innerWidth * dpr);
-      const height = Math.floor(window.innerHeight * dpr);
-      canvas.width = width;
-      canvas.height = height;
-      gl.viewport(0, 0, width, height);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.round(window.innerWidth * dpr);
+      const height = Math.round(window.innerHeight * dpr);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        gl.viewport(0, 0, width, height);
+      }
     };
 
     const render = (time) => {
+      if (time - lastFrameTime < 1000 / targetFPS) {
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+      lastFrameTime = time;
+
       resizeCanvas();
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      const currentTime = (Date.now() - startTime) / 1000;
       gl.uniform2f(iResolutionLocation, canvas.width, canvas.height);
-      gl.uniform1f(iTimeLocation, (time - startTime) / 1000);
+      gl.uniform1f(iTimeLocation, currentTime);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-      requestAnimationFrame(render);
+
+      animationFrameId = requestAnimationFrame(render);
     };
 
-    resizeCanvas();
-    render(performance.now());
+    render();
 
     window.addEventListener("resize", resizeCanvas);
-    return () => window.removeEventListener("resize", resizeCanvas);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", resizeCanvas);
+    };
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
       style={{
-        position: "fixed",
+        position: "absolute",
         top: 0,
         left: 0,
         width: "100%",
