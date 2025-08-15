@@ -1,6 +1,9 @@
+
 import React from 'react';
 import AmbientSoundBar from '../sound/AmbientSoundBar.jsx';
 import { useAuth } from '../../contexts/AuthContext';
+import { Link } from 'react-router-dom';
+
 
 const HeroSection = () => {
   const { userInfo } = useAuth();
@@ -17,9 +20,9 @@ const HeroSection = () => {
       </p>
       {!userInfo && (
         <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <a href="/signup" className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-8 rounded-full transition-colors text-lg shadow-lg">
+          <Link to="/signup" className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-8 rounded-full transition-colors text-lg shadow-lg">
             Get Started Free
-          </a>
+          </Link>
         </div>
       )}
       <br /><br />
