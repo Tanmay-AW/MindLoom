@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from "react";
 
 const vertexShaderSource = `
@@ -9,7 +8,7 @@ const vertexShaderSource = `
 `;
 
 const fragmentShaderSource = `
-precision highp float;  // <-- Use highp for mobile
+precision highp float;
 uniform vec2 iResolution;
 uniform float iTime;
 #define TAU 6.28318530718
@@ -105,28 +104,27 @@ function ReflectBackground() {
     let startTime = Date.now();
     let animationFrameId;
 
-    // Helper: set both CSS and canvas buffer size
+    // Cap DPR for mobile performance!
+    const MAX_DPR = 2;
     const resizeCanvas = () => {
-      const dpr = window.devicePixelRatio || 1;
-      // Use parent or window size
-      const parent = canvas.parentNode;
-      const rect = parent ? parent.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
-      const width = Math.round(rect.width * dpr);
-      const height = Math.round(rect.height * dpr);
+      const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
+      const width = Math.round(window.innerWidth * dpr);
+      const height = Math.round(window.innerHeight * dpr);
 
-      // Only update if needed
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
-        // Set CSS size in px
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
         gl.viewport(0, 0, width, height);
       }
     };
 
+    // Only resize on window resize, not every frame!
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
     const render = () => {
-      resizeCanvas();
       const currentTime = (Date.now() - startTime) / 1000;
       gl.uniform2f(iResolutionLocation, canvas.width, canvas.height);
       gl.uniform1f(iTimeLocation, currentTime);
@@ -134,11 +132,8 @@ function ReflectBackground() {
       animationFrameId = requestAnimationFrame(render);
     };
 
-    // Force resize on mount
-    resizeCanvas();
     render();
 
-    window.addEventListener("resize", resizeCanvas);
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", resizeCanvas);
@@ -149,14 +144,14 @@ function ReflectBackground() {
     <canvas
       ref={canvasRef}
       style={{
-        position: "absolute",
+        position: "fixed",
         top: 0,
         left: 0,
-        // Remove vw/vh, let resizeCanvas set real px size
+        width: "100vw",
+        height: "100vh",
         display: "block",
         zIndex: -1,
-        width: "100%",    // fallback for browsers with no JS
-        height: "100%",
+        pointerEvents: "none"
       }}
       tabIndex={-1}
       aria-hidden="true"
