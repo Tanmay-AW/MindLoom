@@ -1,38 +1,28 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** === CONFIG YOU CAN TWEAK === */
-const MOBILE_FALLBACK = true;       // try video on mobile by default
-const LOWPOWER_FALLBACK = true;     // try video if GPU looks weak
-const MOBILE_RENDER_SCALE = 0.5;    // internal WebGL scale on mobile (lower = safer)
-const DESKTOP_RENDER_SCALE = 0.75;  // internal WebGL scale on desktop
-const MOBILE_FPS = 24;              // cap FPS on mobile
-const DESKTOP_FPS = 60;             // cap FPS on desktop
-
-/** Provide your video files here (short seamless loop, 6–12s) */
-const VIDEO_SOURCES = [
-  { src: "/video/bg-loop.webm", type: "video/webm" },
-  { src: "/video/bg-loop.mp4",  type: "video/mp4" },
-];
+import React, { useEffect, useRef } from "react";
 
 const vertexShaderSource = `
   attribute vec4 a_position;
-  void main() { gl_Position = a_position; }
+  void main() {
+    gl_Position = a_position;
+  }
 `;
 
 const fragmentShaderSource = `
-precision mediump float;
+precision highp float;  // <-- Use highp for mobile
 uniform vec2 iResolution;
 uniform float iTime;
 #define TAU 6.28318530718
 #define MAX_ITER 5
+
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    vec2 pixel = floor(fragCoord) + 0.5;              // stabilize sampling
-    vec2 uv = pixel / iResolution.xy;
-    float time = iTime * 0.03 + 23.0;                 // slow time
+    float time = iTime * 0.1 + 23.0;
+    vec2 uv = fragCoord.xy / iResolution.xy;
     vec2 p = mod(uv * TAU, TAU) - 250.0;
     vec2 i = vec2(p);
     float c = 1.0;
-    float inten = 0.005;                               // mild smoothing
+    float inten = 0.004;
+
     for (int n = 0; n < MAX_ITER; n++) {
         float t = time * (1.0 - (3.5 / float(n + 1)));
         i = p + vec2(cos(t - i.x) + sin(t + i.y),
@@ -42,191 +32,136 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
             p.y / (cos(i.y + t) / inten)
         ));
     }
+
     c /= float(MAX_ITER);
     c = 1.17 - pow(c, 1.4);
     vec3 colour = vec3(pow(abs(c), 4.0));
-    colour = clamp(mix(colour, vec3(0.12, 0.18, 0.23), 0.18), 0.0, 1.0);
+    colour = clamp(colour + vec3(0.1, 0.2, 0.25), 0.0, 1.0);
     fragColor = vec4(colour, 1.0);
 }
-void main() { mainImage(gl_FragColor, gl_FragCoord.xy); }
+
+void main() {
+    mainImage(gl_FragColor, gl_FragCoord.xy);
+}
 `;
 
-function isMobileUA() {
-  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
-/** quick GPU capability sniff */
-function looksLowPower(gl) {
-  try {
-    const dbg = gl.getExtension("WEBGL_debug_renderer_info");
-    const renderer = dbg && gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
-    const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 0;
-    const highp = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
-    const highpGood = highp && highp.precision >= 20; // crude
-    const badRenderer = renderer && /(mali|powervr|adreno 3|apple a10|a9|mt\d+)/i.test(renderer);
-    return maxTex < 4096 || !highpGood || badRenderer;
-  } catch { return true; }
-}
-
-export default function ReflectBackground() {
-  const [useVideo, setUseVideo] = useState(false);
+function ReflectBackground() {
   const canvasRef = useRef(null);
-  const videoRef = useRef(null);
-
-  // Allow manual override via URL: ?gl=1 (force WebGL), ?gl=0 (force video)
-  const forcedMode = useMemo(() => {
-    const m = new URLSearchParams(window.location.search).get("gl");
-    return m === "1" ? "webgl" : m === "0" ? "video" : null;
-  }, []);
 
   useEffect(() => {
-    if (forcedMode === "video") { setUseVideo(true); return; }
-    if (forcedMode === "webgl") { setUseVideo(false); return; }
-
-    // Prefer video on mobile/weak GPUs
-    if (MOBILE_FALLBACK && isMobileUA()) { setUseVideo(true); return; }
-
-    // Probe WebGL quickly; if weak, fallback to video
-    const testCanvas = document.createElement("canvas");
-    const gl = testCanvas.getContext("webgl", { antialias: false });
-    if (!gl) { setUseVideo(true); return; }
-    if (LOWPOWER_FALLBACK && looksLowPower(gl)) { setUseVideo(true); return; }
-
-    setUseVideo(false);
-  }, [forcedMode]);
-
-  // VIDEO PATH — simple, stable, zero shimmer
-  useEffect(() => {
-    if (!useVideo) return;
-    const v = videoRef.current;
-    if (!v) return;
-    const onCanPlay = () => v.play().catch(() => {});
-    v.addEventListener("canplay", onCanPlay);
-    return () => v.removeEventListener("canplay", onCanPlay);
-  }, [useVideo]);
-
-  // WEBGL PATH — reduced internal res, frame cap, pause during scroll/hidden
-  useEffect(() => {
-    if (useVideo) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const gl =
-      canvas.getContext("webgl", {
-        antialias: false,
-        preserveDrawingBuffer: false,
-        powerPreference: "high-performance"
-      }) || canvas.getContext("experimental-webgl");
-    if (!gl) { setUseVideo(true); return; }
-
-    // Build program
-    const compile = (type, src) => {
-      const sh = gl.createShader(type);
-      gl.shaderSource(sh, src); gl.compileShader(sh);
-      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(sh)); return null;
-      }
-      return sh;
-    };
-    const vs = compile(gl.VERTEX_SHADER, vertexShaderSource);
-    const fs = compile(gl.FRAGMENT_SHADER, fragmentShaderSource);
-    if (!vs || !fs) { setUseVideo(true); return; }
-    const prog = gl.createProgram();
-    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      console.error(gl.getProgramInfoLog(prog)); setUseVideo(true); return;
+    const gl = canvas.getContext("webgl", { antialias: true });
+    if (!gl) {
+      console.error("WebGL not supported");
+      return;
     }
-    gl.useProgram(prog);
 
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      -1,-1, 1,-1, -1,1,
-      -1, 1, 1,-1,  1,1
-    ]), gl.STATIC_DRAW);
-    const pos = gl.getAttribLocation(prog, "a_position");
-    gl.enableVertexAttribArray(pos);
-    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+    const compileShader = (type, source) => {
+      const shader = gl.createShader(type);
+      if (!shader) return null;
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error("Shader compilation error:", gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    };
 
-    const uRes = gl.getUniformLocation(prog, "iResolution");
-    const uTime = gl.getUniformLocation(prog, "iTime");
+    const vertexShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
+    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+    if (!vertexShader || !fragmentShader) return;
 
-    const isMobile = isMobileUA();
-    const scale = isMobile ? MOBILE_RENDER_SCALE : DESKTOP_RENDER_SCALE;
-    const targetFPS = isMobile ? MOBILE_FPS : DESKTOP_FPS;
+    const program = gl.createProgram();
+    if (!program) return;
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
 
-    const resize = () => {
-      const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 3)) * scale;
-      const w = Math.max(1, Math.floor(window.innerWidth * dpr));
-      const h = Math.max(1, Math.floor(window.innerHeight * dpr));
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w; canvas.height = h; gl.viewport(0,0,w,h);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error("Program linking error:", gl.getProgramInfoLog(program));
+      return;
+    }
+
+    gl.useProgram(program);
+
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+      gl.STATIC_DRAW
+    );
+
+    const positionLocation = gl.getAttribLocation(program, "a_position");
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    const iResolutionLocation = gl.getUniformLocation(program, "iResolution");
+    const iTimeLocation = gl.getUniformLocation(program, "iTime");
+
+    let startTime = Date.now();
+    let animationFrameId;
+
+    // Helper: set both CSS and canvas buffer size
+    const resizeCanvas = () => {
+      const dpr = window.devicePixelRatio || 1;
+      // Use parent or window size
+      const parent = canvas.parentNode;
+      const rect = parent ? parent.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
+      const width = Math.round(rect.width * dpr);
+      const height = Math.round(rect.height * dpr);
+
+      // Only update if needed
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        // Set CSS size in px
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+        gl.viewport(0, 0, width, height);
       }
     };
 
-    let raf = 0, last = 0, start = performance.now();
-    let scrolling = false, paused = document.hidden;
-    let scrollTimer = 0;
-
-    const onScroll = () => { scrolling = true; clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => (scrolling = false), 120); };
-    const onVisibility = () => { paused = document.hidden; };
-    window.addEventListener("resize", resize, { passive: true });
-    window.addEventListener("orientationchange", resize, { passive: true });
-    window.addEventListener("scroll", onScroll, { passive: true });
-    document.addEventListener("visibilitychange", onVisibility);
-
-    const render = (t) => {
-      if (paused || scrolling || t - last < 1000 / targetFPS) { raf = requestAnimationFrame(render); return; }
-      last = t;
-      resize();
-      const timeSec = (t - start) / 1000;
-      gl.uniform2f(uRes, canvas.width, canvas.height);
-      gl.uniform1f(uTime, timeSec);
+    const render = () => {
+      resizeCanvas();
+      const currentTime = (Date.now() - startTime) / 1000;
+      gl.uniform2f(iResolutionLocation, canvas.width, canvas.height);
+      gl.uniform1f(iTimeLocation, currentTime);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-      raf = requestAnimationFrame(render);
+      animationFrameId = requestAnimationFrame(render);
     };
-    raf = requestAnimationFrame(render);
 
+    // Force resize on mount
+    resizeCanvas();
+    render();
+
+    window.addEventListener("resize", resizeCanvas);
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
-      window.removeEventListener("orientationchange", resize);
-      window.removeEventListener("scroll", onScroll);
-      document.removeEventListener("visibilitychange", onVisibility);
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", resizeCanvas);
     };
-  }, [useVideo]);
+  }, []);
 
-  // Shared style: full-viewport, behind everything
-  const baseStyle = {
-    position: "fixed",
-    inset: 0,
-    width: "100vw",
-    height: "100vh",
-    display: "block",
-    zIndex: -1,
-    objectFit: "cover",
-    // We let the browser upscale smoothly; if you want sharp pixels, try "pixelated"
-    imageRendering: "auto"
-  };
-
-  if (useVideo) {
-    return (
-      <video
-        ref={videoRef}
-        style={baseStyle}
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-        poster="/video/bg-poster.jpg"  // optional placeholder
-      >
-        {VIDEO_SOURCES.map(s => (
-          <source key={s.src} src={s.src} type={s.type}/>
-        ))}
-      </video>
-    );
-  }
-
-  return <canvas ref={canvasRef} style={baseStyle} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        // Remove vw/vh, let resizeCanvas set real px size
+        display: "block",
+        zIndex: -1,
+        width: "100%",    // fallback for browsers with no JS
+        height: "100%",
+      }}
+      tabIndex={-1}
+      aria-hidden="true"
+    />
+  );
 }
+
+export default ReflectBackground;

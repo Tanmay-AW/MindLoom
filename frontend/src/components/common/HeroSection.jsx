@@ -18,7 +18,7 @@ const HeroSection = () => {
       {!userInfo && (
         <div className="flex flex-col sm:flex-row gap-4 mb-16">
           <a href="/signup" className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-8 rounded-full transition-colors text-lg shadow-lg">
-            Get Started 
+            Get Started Free
           </a>
         </div>
       )}
